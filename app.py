@@ -3,16 +3,8 @@ import sqlite3
 
 app=Flask(__name__)
 
-# @app.route('/')
-# def home():
-#     return "Hello World!"
-
-# @app.route('/<name>')
-# def name(name):
-#     return f"Hi {name}, Welcome to the page"
-
-
 def db_connection():
+    #return a connection to the database or None if it fails.
     conn=None
     try:
         conn=sqlite3.connect("telephone.sqlite")
@@ -46,31 +38,45 @@ def telephone():
 
 @app.route('/telephone/<int:id>', methods=["GET","PUT","DELETE"])
 def single_contact(id):
-    if request.method=='GET':
-        for num in telephone_list:
-            if num['id']==id:
-                return jsonify(num)
-            pass
-    if request.method=='PUT':
-        for num in telephone_list:
-            if num['id']==id:   
-                num['name']=request.form['name']
-                num['number']=request.form['number']
-                num['company']=request.form['company']
+    conn = db_connection()
+    cursor=conn.cursor()
+    telephone=None
 
-                updated_telephone={
-                    'id':id,
-                    'name':num['name'],
-                    'number':num['number'],
-                    'company':num['company']
-                }
-                return jsonify(updated_telephone)
+    if request.method=='GET':
+        # Get a specific contact
+        cursor.execute("SELECT * FROM telephone WHERE id=?",(id,))
+        rows=cursor.fetchall()
+        for r in rows:
+            telephone=r
+        if telephone is not None:
+            return jsonify(telephone),200
+        else:
+            return "Something Wrong",404
+
+    if request.method=='PUT':
+        # Update the information of a specific contact
+        sql= """UPDATE telephone SET name=?, number=?, company=? WHERE id=?"""
+        name=request.form['name']
+        number=request.form['number']
+        company=request.form['company']
+
+        updated_telephone={
+            'id':id,
+            'name':name,
+            'number':number,
+            'company':company
+        }
+        conn.execute(sql,(name,number,company,id))
+        conn.commit()
+        return jsonify(updated_telephone)
+
     if request.method=='DELETE':
-        for index,num in enumerate(telephone_list):
-            if num['id'] == id:
-                telephone_list.pop(index)
-                return jsonify({'message': 'Contact deleted successfully'})
-        return jsonify({'message': 'Contact not found'}), 404
+        # Delete a specific contact
+        sql= "DELETE FROM telephone WHERE id=?"
+        conn.execute(sql,(id,))
+        conn.commit()
+        return f"The telephone record with {id} has been deleted.",200
+
 
 
 if  __name__=='__main__':
